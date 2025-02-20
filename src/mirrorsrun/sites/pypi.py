@@ -6,6 +6,7 @@ from starlette.responses import Response
 from mirrorsrun.config import BASE_URL_PYPI, BASE_URL_PYPI_FILES
 from mirrorsrun.proxy.direct import direct_proxy
 from mirrorsrun.proxy.file_cache import try_file_based_cache
+from starlette.status import HTTP_504_GATEWAY_TIMEOUT
 
 
 def pypi_replace(request: Request, response: Response) -> Response:
@@ -38,6 +39,9 @@ async def pypi(request: Request) -> Response:
         return Response(content="Not Found", status_code=404)
 
     if path.endswith(".whl") or path.endswith(".tar.gz"):
-        return await try_file_based_cache(request, target_url)
+        response = await try_file_based_cache(request, target_url)
+        if response.status_code == HTTP_504_GATEWAY_TIMEOUT:
+            return await direct_proxy(request, target_url)
+        return response
 
     return await direct_proxy(request, target_url, post_process=pypi_replace)
